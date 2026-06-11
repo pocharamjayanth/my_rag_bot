@@ -18,7 +18,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 elif os.environ.get("GOOGLE_API_KEY"):
     api_key = os.environ.get("GOOGLE_API_KEY")
 
-# Intercept empty, space-only, or default placeholder strings cleanly
+# Intercept empty or unconfigured keys cleanly without throwing raw script errors
 if not api_key or api_key.strip() == "" or api_key == "YOUR_API_KEY_HERE":
     st.error("🔑 **Gemini API Key Required**")
     st.info("""
@@ -38,14 +38,10 @@ def read_markdown_file(filename):
             return f.read()
     return ""
 
-# Load Agent identity and Skill execution workflows dynamically
-agent_instructions = read_markdown_file("agent.md")
-skill_instructions = read_markdown_file("skill.md")
-
 # Ensure upload directory exists
 os.makedirs("./uploaded_files", exist_ok=True)
 
-# 3. Sidebar for Dynamic File Upload
+# 3. Sidebar for Dynamic File Upload and Skill Selection Grid
 with st.sidebar:
     st.header("📂 Document Ingestion")
     uploaded_files = st.file_uploader("Upload Medical Guidelines / PDFs", accept_multiple_files=True, type="pdf")
@@ -58,6 +54,37 @@ with st.sidebar:
         st.success(f"{len(uploaded_files)} PDF(s) uploaded successfully!")
     else:
         st.info("Please upload one or more PDFs to start chatting.")
+        
+    st.write("---")
+    st.header("🧠 Agentic Skill Engine")
+    
+    # Dynamic skill routing dropdown selection menu
+    selected_skill_name = st.selectbox(
+        "Activate Specialized Capability Mapping:",
+        [
+            "General Synthesis & Extraction",
+            "Pharmacology & Dosage Auditor",
+            "Patient Jargon Translator",
+            "Differential Diagnosis Explorer",
+            "High-Velocity Triage Router"
+        ]
+    )
+
+# Mapping option choice to its corresponding local file path
+skill_file_map = {
+    "General Synthesis & Extraction": "skill.md",
+    "Pharmacology & Dosage Auditor": "skill_dosage_checker.md",
+    "Patient Jargon Translator": "skill_patient_translator.md",
+    "Differential Diagnosis Explorer": "skill_differential_explorer.md",
+    "High-Velocity Triage Router": "skill_emergency_triage.md"
+}
+
+# Read chosen instructions context in real time on UI interactions
+agent_instructions = read_markdown_file("agent.md")
+skill_instructions = read_markdown_file(skill_file_map[selected_skill_name])
+
+# Display active skill status badge in sidebar window
+st.sidebar.success(f"⚡ Active Skill Brain: {selected_skill_name}")
 
 # 4. Initialize RAG Pipeline (Passing api_key as a parameter breaks stale validation caches)
 @st.cache_resource
@@ -79,7 +106,6 @@ def load_vector_store(runtime_key):
 
 # 5. Build Database and Initialize LLM
 try:
-    # Trigger the pipeline passing our validated key string
     vectorstore = load_vector_store(api_key)
     if vectorstore is not None:
         llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
@@ -102,7 +128,7 @@ for message in st.session_state.messages:
             with st.expander("📚 View Source References"):
                 st.markdown(message["sources"])
 
-# 7. Handle User Query (Orchestrated with Agent & Skill Specifications)
+# 7. Handle User Query (Orchestrated with Selected Agent & Skill Specifications)
 if user_query := st.chat_input("Ask a question about the uploaded documents..."):
     if not db_ready:
         st.warning("Database is not ready. Please upload PDF documents in the sidebar first.")
@@ -114,7 +140,7 @@ if user_query := st.chat_input("Ask a question about the uploaded documents...")
 
         # Generate assistant response
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing documents via customized agent framework..."):
+            with st.spinner(f"Processing via {selected_skill_name} matrix..."):
                 try:
                     # Retrieve relevant chunks
                     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
@@ -122,7 +148,7 @@ if user_query := st.chat_input("Ask a question about the uploaded documents...")
                     
                     context = "\n\n".join([doc.page_content for doc in relevant_docs])
                     
-                    # Unified Contextual Architecture Blueprint
+                    # Unified Dynamic Blueprint Prompter
                     prompt = f"""
 {agent_instructions}
 
@@ -136,7 +162,7 @@ if user_query := st.chat_input("Ask a question about the uploaded documents...")
 ### USER QUERY:
 {user_query}
 
-Remember to follow the operational constraints of the Agent and the structural layout defined in the Skill.
+Remember to follow the operational constraints of the Agent and the structural layout defined in the active Skill.
 """
 
                     response = llm.invoke(prompt)
