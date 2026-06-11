@@ -3,15 +3,26 @@ import streamlit as st
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.vectorstores import Chroma
+from langchain_core.vectorstores import InMemoryVectorStore
 
-# 1. Page Configuration
+# 1. Page Configuration (Clean Title - Caption Removed)
 st.set_page_config(page_title="MediBot: AI Medical Assistant", page_icon="🩺", layout="wide")
 st.title("🩺 MediBot: Intelligent Medical Document Assistant")
-st.caption("A RAG-powered hackathon application built by Jayanth & Harsha")
 
-# 2. Setup API Key - Insert your AI Studio key here
-os.environ["GOOGLE_API_KEY"] = "YOUR_API_KEY_HERE"
+# 2. Setup API Key (Securely loaded via Streamlit Secrets)
+if "GOOGLE_API_KEY" in st.secrets:
+    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+
+# Helper function to safely read markdown behavior files
+def read_markdown_file(filename):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            return f.read()
+    return ""
+
+# Load Agent identity and Skill execution workflows dynamically
+agent_instructions = read_markdown_file("agent.md")
+skill_instructions = read_markdown_file("skill.md")
 
 # Ensure upload directory exists
 os.makedirs("./uploaded_files", exist_ok=True)
@@ -43,9 +54,9 @@ def load_vector_store():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_documents(docs)
     
-    # Generate vector store
+    # Generate in-memory vector store (Avoids native protobuf/C++ bugs entirely)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-    vectorstore = Chroma.from_documents(chunks, embeddings)
+    vectorstore = InMemoryVectorStore.from_documents(chunks, embeddings)
     return vectorstore
 
 # 5. Build Database and Initialize LLM
@@ -72,7 +83,7 @@ for message in st.session_state.messages:
             with st.expander("📚 View Source References"):
                 st.markdown(message["sources"])
 
-# 7. Handle User Query
+# 7. Handle User Query (Orchestrated with Agent & Skill Specifications)
 if user_query := st.chat_input("Ask a question about the uploaded documents..."):
     if not db_ready:
         st.warning("Database is not ready. Please upload PDF documents in the sidebar first.")
@@ -84,7 +95,7 @@ if user_query := st.chat_input("Ask a question about the uploaded documents...")
 
         # Generate assistant response
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing documents and generating medical insights..."):
+            with st.spinner("Analyzing documents via customized agent framework..."):
                 try:
                     # Retrieve relevant chunks
                     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
@@ -92,15 +103,22 @@ if user_query := st.chat_input("Ask a question about the uploaded documents...")
                     
                     context = "\n\n".join([doc.page_content for doc in relevant_docs])
                     
-                    # Prompt Engineering ensuring grounding
-                    prompt = f"""You are MediBot, an expert AI medical assistant. Answer the query based strictly and only on the provided context.
-If the answer cannot be found in the context, state clearly: "I cannot find the answer in the provided documents." Do not make up information.
+                    # Unified Contextual Architecture Blueprint
+                    prompt = f"""
+{agent_instructions}
 
-Context:
+{skill_instructions}
+
+---
+### RETRIEVED DOCUMENT CONTEXT:
 {context}
 
-Query:
-{user_query}"""
+---
+### USER QUERY:
+{user_query}
+
+Remember to follow the operational constraints of the Agent and the structural layout defined in the Skill.
+"""
 
                     response = llm.invoke(prompt)
                     answer = response.content
