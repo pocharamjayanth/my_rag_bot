@@ -9,9 +9,27 @@ from langchain_core.vectorstores import InMemoryVectorStore
 st.set_page_config(page_title="MediBot: AI Medical Assistant", page_icon="🩺", layout="wide")
 st.title("🩺 MediBot: Intelligent Medical Document Assistant")
 
-# 2. Setup API Key (Securely loaded via Streamlit Secrets)
+# 2. Secure API Key Interceptor
+api_key = None
+
+# Safely extract the credential string from local secrets or environment variables
 if "GOOGLE_API_KEY" in st.secrets:
-    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+    api_key = st.secrets["GOOGLE_API_KEY"]
+elif os.environ.get("GOOGLE_API_KEY"):
+    api_key = os.environ.get("GOOGLE_API_KEY")
+
+# Intercept empty, space-only, or default placeholder strings cleanly
+if not api_key or api_key.strip() == "" or api_key == "YOUR_API_KEY_HERE":
+    st.error("🔑 **Gemini API Key Required**")
+    st.info("""
+    To activate MediBot, please ensure your valid Gemini API key is configured:
+    * **Locally:** In a file named `.streamlit/secrets.toml` with the entry: `GOOGLE_API_KEY = "your_key"`
+    * **Cloud Deployment:** Pasted directly into the Streamlit Cloud secrets management input box.
+    """)
+    st.stop()
+
+# Set environment fallback context
+os.environ["GOOGLE_API_KEY"] = api_key
 
 # Helper function to safely read markdown behavior files
 def read_markdown_file(filename):
@@ -41,9 +59,9 @@ with st.sidebar:
     else:
         st.info("Please upload one or more PDFs to start chatting.")
 
-# 4. Initialize RAG Pipeline (Cached to avoid reloading on every keystroke)
+# 4. Initialize RAG Pipeline (Passing api_key as a parameter breaks stale validation caches)
 @st.cache_resource
-def load_vector_store():
+def load_vector_store(runtime_key):
     if not os.path.exists("./uploaded_files") or not os.listdir("./uploaded_files"):
         return None
     
@@ -54,16 +72,17 @@ def load_vector_store():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_documents(docs)
     
-    # Generate in-memory vector store (Avoids native protobuf/C++ bugs entirely)
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+    # Generate vector store with the dynamically tracked runtime key argument
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=runtime_key)
     vectorstore = InMemoryVectorStore.from_documents(chunks, embeddings)
     return vectorstore
 
 # 5. Build Database and Initialize LLM
 try:
-    vectorstore = load_vector_store()
+    # Trigger the pipeline passing our validated key string
+    vectorstore = load_vector_store(api_key)
     if vectorstore is not None:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
         db_ready = True
     else:
         db_ready = False
