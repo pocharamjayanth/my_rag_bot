@@ -1,186 +1,133 @@
 import os
+import re
 import streamlit as st
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_core.vectorstores import InMemoryVectorStore
+import pymupdf4llm
+from llama_cpp import Llama
 
-# 1. Page Configuration (Clean Title - Caption Removed)
-st.set_page_config(page_title="MediBot: AI Medical Assistant", page_icon="🩺", layout="wide")
-st.title("🩺 MediBot: Intelligent Medical Document Assistant")
+# 1. Page Configuration
+st.set_page_config(page_title="MediBot: Local Assistant", page_icon="🩺", layout="wide")
+st.title("🩺 MediBot: Local-First Intelligent Document Assistant")
+st.caption("Powered by Mozilla.ai Roaming RAG Blueprint (100% Private, Offline)")
 
-# 2. Secure API Key Interceptor
-api_key = None
-
-# Safely extract the credential string from local secrets or environment variables
-if "GOOGLE_API_KEY" in st.secrets:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-elif os.environ.get("GOOGLE_API_KEY"):
-    api_key = os.environ.get("GOOGLE_API_KEY")
-
-# Intercept empty or unconfigured keys cleanly without throwing raw script errors
-if not api_key or api_key.strip() == "" or api_key == "YOUR_API_KEY_HERE":
-    st.error("🔑 **Gemini API Key Required**")
-    st.info("""
-    To activate MediBot, please ensure your valid Gemini API key is configured:
-    * **Locally:** In a file named `.streamlit/secrets.toml` with the entry: `GOOGLE_API_KEY = "your_key"`
-    * **Cloud Deployment:** Pasted directly into the Streamlit Cloud secrets management input box.
-    """)
-    st.stop()
-
-# Set environment fallback context
-os.environ["GOOGLE_API_KEY"] = api_key
-
-# Helper function to safely read markdown behavior files
-def read_markdown_file(filename):
-    if os.path.exists(filename):
-        with open(filename, "r", encoding="utf-8") as f:
-            return f.read()
-    return ""
-
-# Ensure upload directory exists
+# Ensure storage directories exist
 os.makedirs("./uploaded_files", exist_ok=True)
 
-# 3. Sidebar for Dynamic File Upload and Skill Selection Grid
+# Update this path if your model filename is slightly different
+MODEL_PATH = "./models/Qwen2.5-7B-Instruct-Q4_K_M.gguf" 
+
+# 2. Lazy Initialization of Local Model Engine
+@st.cache_resource
+def get_local_llm(model_path):
+    if not os.path.exists(model_path):
+        st.error(f"❌ Model file not found at `{model_path}`. Please verify your models folder.")
+        st.stop()
+    # n_ctx sets the token context capacity for local data evaluation
+    return Llama(model_path=model_path, n_ctx=4096, n_threads=4)
+
+try:
+    llm = get_local_llm(MODEL_PATH)
+except Exception as e:
+    st.error(f"Failed to initialize local inference engine: {e}")
+    st.stop()
+
+# Helper function to segment Markdown by header levels
+def partition_markdown_to_sections(md_text):
+    pattern = r'(^#{1,4}\s+.*$)'
+    parts = re.split(pattern, md_text, flags=re.MULTILINE)
+    
+    sections = {}
+    current_heading = "Introduction / Document Meta"
+    sections[current_heading] = ""
+    
+    for part in parts:
+        if re.match(pattern, part):
+            current_heading = part.strip()
+            sections[current_heading] = ""
+        else:
+            sections[current_heading] += part
+            
+    return {k: v.strip() for k, v in sections.items() if v.strip()}
+
+# 3. Sidebar Document Processing Matrix
 with st.sidebar:
     st.header("📂 Document Ingestion")
-    uploaded_files = st.file_uploader("Upload Medical Guidelines / PDFs", accept_multiple_files=True, type="pdf")
+    uploaded_file = st.file_uploader("Upload structured PDF Guide", type="pdf")
     
-    if uploaded_files:
-        # Save uploaded files to the local directory
-        for uploaded_file in uploaded_files:
-            with open(os.path.join("./uploaded_files", uploaded_file.name), "wb") as f:
-                f.write(uploaded_file.getbuffer())
-        st.success(f"{len(uploaded_files)} PDF(s) uploaded successfully!")
+    if uploaded_file:
+        file_save_path = os.path.join("./uploaded_files", uploaded_file.name)
+        with open(file_save_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+            
+        with st.spinner("Extracting layout headers via PyMuPDF4LLM..."):
+            raw_markdown = pymupdf4llm.to_markdown(file_save_path)
+            document_sections = partition_markdown_to_sections(raw_markdown)
+            
+        st.success("Document structured cleanly!")
+        st.info(f"Detected {len(document_sections)} unique content headers.")
     else:
-        st.info("Please upload one or more PDFs to start chatting.")
-        
-    st.write("---")
-    st.header("🧠 Agentic Skill Engine")
-    
-    # Dynamic skill routing dropdown selection menu
-    selected_skill_name = st.selectbox(
-        "Activate Specialized Capability Mapping:",
-        [
-            "General Synthesis & Extraction",
-            "Pharmacology & Dosage Auditor",
-            "Patient Jargon Translator",
-            "Differential Diagnosis Explorer",
-            "High-Velocity Triage Router"
-        ]
-    )
+        document_sections = None
+        st.info("Upload a medical guide or textbook chapter to begin.")
 
-# Mapping option choice to its corresponding local file path
-skill_file_map = {
-    "General Synthesis & Extraction": "skill.md",
-    "Pharmacology & Dosage Auditor": "skill_dosage_checker.md",
-    "Patient Jargon Translator": "skill_patient_translator.md",
-    "Differential Diagnosis Explorer": "skill_differential_explorer.md",
-    "High-Velocity Triage Router": "skill_emergency_triage.md"
-}
-
-# Read chosen instructions context in real time on UI interactions
-agent_instructions = read_markdown_file("agent.md")
-skill_instructions = read_markdown_file(skill_file_map[selected_skill_name])
-
-# Display active skill status badge in sidebar window
-st.sidebar.success(f"⚡ Active Skill Brain: {selected_skill_name}")
-
-# 4. Initialize RAG Pipeline (Passing api_key as a parameter breaks stale validation caches)
-@st.cache_resource
-def load_vector_store(runtime_key):
-    if not os.path.exists("./uploaded_files") or not os.listdir("./uploaded_files"):
-        return None
-    
-    # Load and split PDFs
-    loader = DirectoryLoader('./uploaded_files', glob="./*.pdf", loader_cls=PyPDFLoader)
-    docs = loader.load()
-    
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    chunks = text_splitter.split_documents(docs)
-    
-    # Generate vector store with the dynamically tracked runtime key argument
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=runtime_key)
-    vectorstore = InMemoryVectorStore.from_documents(chunks, embeddings)
-    return vectorstore
-
-# 5. Build Database and Initialize LLM
-try:
-    vectorstore = load_vector_store(api_key)
-    if vectorstore is not None:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
-        db_ready = True
-    else:
-        db_ready = False
-except Exception as e:
-    st.error(f"Error building vector store: {e}")
-    db_ready = False
-
-# 6. Initialize Chat History
+# 4. Chat Interface Management
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display Chat Messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if "sources" in message and message["sources"]:
-            with st.expander("📚 View Source References"):
-                st.markdown(message["sources"])
 
-# 7. Handle User Query (Orchestrated with Selected Agent & Skill Specifications)
-if user_query := st.chat_input("Ask a question about the uploaded documents..."):
-    if not db_ready:
-        st.warning("Database is not ready. Please upload PDF documents in the sidebar first.")
+# 5. Mozilla Blueprint Workflow Execution
+if user_query := st.chat_input("Ask a question about the document..."):
+    if not document_sections:
+        st.warning("Please upload a PDF document in the sidebar first.")
     else:
-        # Append and display user message
         st.session_state.messages.append({"role": "user", "content": user_query})
         with st.chat_message("user"):
             st.markdown(user_query)
 
-        # Generate assistant response
         with st.chat_message("assistant"):
-            with st.spinner(f"Processing via {selected_skill_name} matrix..."):
-                try:
-                    # Retrieve relevant chunks
-                    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-                    relevant_docs = retriever.invoke(user_query)
-                    
-                    context = "\n\n".join([doc.page_content for doc in relevant_docs])
-                    
-                    # Unified Dynamic Blueprint Prompter
-                    prompt = f"""
-{agent_instructions}
-
-{skill_instructions}
-
----
-### RETRIEVED DOCUMENT CONTEXT:
-{context}
-
----
-### USER QUERY:
-{user_query}
-
-Remember to follow the operational constraints of the Agent and the structural layout defined in the active Skill.
-"""
-
-                    response = llm.invoke(prompt)
-                    answer = response.content
-                    
-                    # Format sources for UI expander
-                    source_text = ""
-                    for i, doc in enumerate(relevant_docs):
-                        source_text += f"**Source {i+1} (Page {doc.metadata.get('page', 'N/A')}):**\n`{doc.page_content[:300]}...`\n\n"
-
-                except Exception as e:
-                    answer = f"Error processing request: {e}"
-                    source_text = ""
+            with st.spinner("Locating relevant document section (Phase 1: FIND)..."):
+                headers_list = "\n".join([f"- {h}" for h in document_sections.keys()])
                 
-                st.markdown(answer)
-                if source_text:
-                    with st.expander("📚 View Source References"):
-                        st.markdown(source_text)
-        
-        # Save assistant response and sources to session state
-        st.session_state.messages.append({"role": "assistant", "content": answer, "sources": source_text})
+                routing_prompt = f"""<|im_start|>system
+You are an expert document index router. Analyze the user's question and choose exactly ONE section heading from the provided index list that contains the answer. Return only the exact heading string.
+List of Available Headings:
+{headers_list}
+<|im_end|>
+<|im_start|>user
+Question: {user_query}
+Target Heading:<|im_end|>"""
+
+                routing_response = llm(routing_prompt, max_tokens=60, temperature=0.0)
+                selected_heading = routing_response["choices"][0]["text"].strip()
+                
+                matched_heading = None
+                for heading in document_sections.keys():
+                    if heading in selected_heading or selected_heading in heading:
+                        matched_heading = heading
+                        break
+                if not matched_heading:
+                    matched_heading = list(document_sections.keys())[0]
+
+            with st.spinner(f"Synthesizing answer from [{matched_heading}] (Phase 2: ANSWER)..."):
+                context_text = document_sections[matched_heading]
+                
+                generation_prompt = f"""<|im_start|>system
+You are a precise assistant. Synthesize a clean answer using ONLY the provided text context.
+Context Section [{matched_heading}]:
+{context_text}
+<|im_end|>
+<|im_start|>user
+Question: {user_query}
+Answer:<|im_end|>"""
+
+                generation_response = llm(generation_prompt, max_tokens=512, temperature=0.2)
+                answer = generation_response["choices"][0]["text"].strip()
+                
+            st.markdown(answer)
+            st.caption(f"📍 **Source Section Consulted:** `{matched_heading}`")
+            
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": f"{answer}\n\n📍 *Source Section Consulted:* `{matched_heading}`"
+            })
