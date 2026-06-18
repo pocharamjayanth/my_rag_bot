@@ -1,0 +1,25 @@
+﻿repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        name: "Stage 1: Linting (Ruff)"
+        args: [ --fix ]
+      - id: ruff-format
+        name: "Stage 2: Formatting (Ruff-Format)"
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        name: "Stage 3: Type Checking (Mypy)"
+        additional_dependencies: [types-requests]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: "Stage 4: Unit Testing (Pytest)"
+        entry: python -m pytest
+        language: system
+        pass_filenames: false
+        always_run: true
