@@ -1,0 +1,56 @@
+stages:
+  - lint
+  - format
+  - type_check
+  - test
+  - coverage
+  - audit
+
+static_linting:
+  stage: lint
+  image: python:3.11-slim
+  script:
+    - pip install ruff
+    - ruff check .
+
+code_formatting:
+  stage: format
+  image: python:3.11-slim
+  script:
+    - pip install ruff
+    - ruff format --check .
+
+type_checking:
+  stage: type_check
+  image: python:3.11-slim
+  script:
+    - pip install mypy
+    - mypy . --ignore-missing-imports
+
+run_unit_tests:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt pytest-cov
+    - python -m pytest --cov=. tests/
+
+coverage:
+  stage: coverage
+  image: python:3.11-slim
+  script:
+    - pip install pytest-cov
+    - python -m pytest --cov=. --cov-report=term tests/
+
+bandit_static:
+  stage: audit
+  image: python:3.11-slim
+  script:
+    - pip install bandit
+    - bandit -r . -x ./venv
+
+secret_scanning:
+  stage: audit
+  image: zricethezav/gitleaks:latest
+  script:
+    - gitleaks detect --verbose --source=.
+  allow_failure: true

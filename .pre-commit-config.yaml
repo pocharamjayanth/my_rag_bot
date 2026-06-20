@@ -32,12 +32,3 @@ repos:
     hooks:
       - id: gitleaks
         name: Stage 6: Secret Scanning (gitleaks)
-
-  - repo: local
-    hooks:
-      - id: pytest-cov
-        name: Stage 4: Unit Testing & Coverage (Pytest)
-        entry: venv/Scripts/python -m pytest --cov=. tests/
-        language: system
-        pass_filenames: false
-        always_run: true
