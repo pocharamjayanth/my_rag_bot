@@ -1,4 +1,4 @@
-stages:
+﻿stages:
   - lint
   - format
   - type_check
@@ -41,12 +41,12 @@ coverage:
     - pip install pytest-cov
     - python -m pytest --cov=. --cov-report=term tests/
 
-bandit_static:
+pip-audit:
   stage: audit
   image: python:3.11-slim
   script:
-    - pip install bandit
-    - bandit -r . -x ./venv
+    - pip install pip-audit
+    - pip-audit -r requirements.txt
 
 secret_scanning:
   stage: audit
