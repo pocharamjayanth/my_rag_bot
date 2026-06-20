@@ -1,96 +1,81 @@
+﻿import streamlit as st
+import pymupdf4llm
+from llama_cpp import Llama
 import os
 
-import pymupdf4llm
-import streamlit as st
-from llama_cpp import Llama
+st.set_page_config(page_title="MediBot: Secure Medical RAG Assistant", layout="wide")
+st.title("🩺 MediBot: Secure Offline Medical RAG Assistant")
 
-# ==========================================
-# 1. GLOBAL SESSION STATE INITIALIZATION
-# ==========================================
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "context_text" not in st.session_state:
-    st.session_state.context_text = ""
-
-MODEL_PATH = "model.gguf"
-
+st.sidebar.header("🧬 Architecture Configuration")
+# Change this default value if your GGUF file has a different name
+model_filename = st.sidebar.text_input("Local GGUF Model File Name", value="qwen2.5-7b-instruct-q4_k_m.gguf")
+model_path = os.path.join(os.getcwd(), model_filename)
 
 @st.cache_resource
-def load_llm():
-    if not os.path.exists(MODEL_PATH):
-        return None
-    return Llama(model_path=MODEL_PATH, n_ctx=2048, n_threads=4)
+def initialize_native_brain(path):
+    if os.path.exists(path):
+        return Llama(model_path=path, n_ctx=4096, n_threads=4)
+    return None
 
+llm = initialize_native_brain(model_path)
 
-llm = load_llm()
+if llm is None:
+    st.sidebar.error(f"❌ GGUF model file not detected at: {model_path}")
+    st.sidebar.warning("Please verify your downloaded model weights file is sitting right inside your C:\\Users\\pocha\\RAG_Chatbot folder.")
+else:
+    st.sidebar.success("✅ Native C++ Inference Core Loaded Successfully!")
 
-# ==========================================
-# 2. USER INTERFACE LAYOUT
-# ==========================================
-st.set_page_config(page_title="MediBot RAG", page_icon="🩺", layout="centered")
-st.title("🩺 MediBot: Private Medical RAG Assistant")
-st.caption("Powered by Local LLM & Swecha GitLab Pipeline — 100% Offline & Secure")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "context" not in st.session_state:
+    st.session_state.context = ""
 
-with st.sidebar:
-    st.header("Document Repository")
-    uploaded_file = st.file_uploader("Upload Medical Reference (PDF)", type=["pdf"])
+st.sidebar.subheader("📂 Document Ingestion Layer")
+uploaded_file = st.sidebar.file_uploader("Upload Reference PDF Matrix", type=["pdf"])
 
-    if uploaded_file is not None and st.session_state.context_text == "":
-        with st.spinner("Processing medical text with PyMuPDF4LLM..."):
-            temp_filename = "temp_medical_doc.pdf"
-            with open(temp_filename, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            try:
-                st.session_state.context_text = pymupdf4llm.to_markdown(temp_filename)
-                st.success("✅ Document synchronized successfully!")
-            except Exception as e:
-                st.error(f"Error reading PDF: {e}")
-    elif uploaded_file is not None:
-        st.success("✅ Document synchronized successfully!")
+if uploaded_file is not None and not st.session_state.context:
+    with st.spinner("Parsing layout grids via PyMuPDF4LLM..."):
+        temp_path = os.path.join(os.getcwd(), uploaded_file.name)
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        try:
+            st.session_state.context = pymupdf4llm.to_markdown(temp_path)
+            st.sidebar.success("✅ Layout Ingestion Synchronized!")
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception as e:
+            st.sidebar.error(f"Ingestion Exception: {e}")
 
-# ==========================================
-# 3. RENDER EXISTING CHAT HISTORY
-# ==========================================
-if "messages" in st.session_state:
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# ==========================================
-# 4. CHAT INPUT & EXECUTION PIPELINE
-# ==========================================
-if user_query := st.chat_input("Ask a question about your uploaded medical guide..."):
-    # Fail-safe initialization right before interaction
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
+if prompt := st.chat_input("Ask a medical analysis question..."):
     with st.chat_message("user"):
-        st.markdown(user_query)
-    st.session_state.messages.append({"role": "user", "content": user_query})
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
 
-    with st.chat_message("assistant"):
-        if llm is None:
-            st.error("❌ Model file 'model.gguf' not found.")
-        else:
-            with st.spinner("Analyzing document context..."):
-                context = st.session_state.context_text if st.session_state.context_text else "No document uploaded."
+    if llm is None:
+        st.error("Cannot process message. Local model core is not loaded.")
+    else:
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            
+            full_prompt = prompt
+            if st.session_state.context:
+                context_snippet = st.session_state.context[:6000]
+                full_prompt = f"Context:\n{context_snippet}\n\nQuestion: {prompt}\n\nAnswer explicitly using the context:"
 
-                prompt = f"<|im_start|>system\nYou are a professional medical assistant. Answer the user question accurately using only the provided context text.\nContext:\n{context[:4000]}<|im_end|>\n<|im_start|>user\n{user_query}<|im_end|>\n<|im_start|>assistant\n"
-
-                response = llm(prompt, max_tokens=512, stop=["<|im_end|>", "</s>"], echo=False)
-                answer = response["choices"][0]["text"].strip()
-                matched_heading = uploaded_file.name if uploaded_file else "Internal Knowledge Base"
-
-                st.markdown(answer)
-                st.caption(f"📍 **Source Section Consulted:** `{matched_heading}`")
-
-                # Double check fail-safe to guarantee NO key crashes
-                if "messages" not in st.session_state:
-                    st.session_state.messages = []
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": f"{answer}\n\n📍 *Source Section Consulted:* `{matched_heading}`",
-                    }
-                )
+            with st.spinner("Synthesizing context tokens..."):
+                try:
+                    output = llm(
+                        f"<|im_start|>user\n{full_prompt}<|im_end|>\n<|im_start|>assistant\n",
+                        max_tokens=512,
+                        stop=["<|im_end|>", "user", "Context:"],
+                        echo=False
+                    )
+                    response_text = output["choices"][0]["text"].strip()
+                    message_placeholder.markdown(response_text)
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                except Exception as e:
+                    st.error(f"Inference processing failure: {e}")
