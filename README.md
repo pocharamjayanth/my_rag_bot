@@ -1,24 +1,17 @@
-﻿# 🩺 MediBot: Advanced Private & Secure Medical RAG Assistant
-
-An enterprise-grade, 100% offline Retrieval-Augmented Generation (RAG) assistant system engineered to parse complex clinical literature and provide secure, locally-synthesized insights without external cloud API dependencies.
-
-## 🧠 Core System Design Philosophy
-* **On-Premise Computational Boundary:** No third-party cloud API keys, network payload transfers, or external tracking telemetry loops. All analytical assets stay local.
-* **Compliance Standards Engine:** Architecture structure matches modern sandbox deployment validation rules for high-security medical dataset exploration.
-* **Layout-Aware Parsing:** Integrates advanced markdown extraction workflows to transform raw multi-page medical PDFs into accessible corpora while preserving explicit table and paragraph hierarchies.
-
-## 🛠️ Complete Technical Architecture
-* **Interface Layer:** Reactive Streamlit UI web application with component state retention.
-* **Parsing Automation:** PyMuPDF4LLM structural layout extraction pipeline.
-* **Execution Engine:** Local Llama-cpp high-performance quantized inference backend bindings.
-* **Foundational Model:** Qwen-2.5-7B-Instruct 4-bit quantized baseline model.
-
-## 🔒 Automated Software Quality Verification Gates
-To maintain stable code deployment parameters, the codebase runs multiple automated code quality evaluation controls across its lifecycle:
-1. **Stage 1: Code Linting (Ruff):** Analyzes logical code flow, removing dead imports or syntax smells.
-2. **Stage 2: Automatic Formatting (Ruff-Format):** Enforces strict PEP8 line structures.
-3. **Stage 3: Strict Type Checking (Mypy):** Asserts variable assignment type contracts.
-4. **Stage 4: Unit Testing Metrics (Pytest):** Runs test suites under the tests directory.
-5. **Stage 5: Vulnerability Static Analysis (Bandit):** Identifies potential shell injections or weak method references.
-6. **Stage 6: Dependency Verification (Pip-Audit):** Validates package versions against global vulnerability registries.
-7. **Stage 7: Secret Scanning (Gitleaks):** Audits indices to prevent accidental token tracking.
+﻿# 🩺 MediBot: Private & Secure Medical RAG Assistant
+An enterprise-grade, 100% offline Retrieval-Augmented Generation (RAG) system engineered to parse complex medical literature, clinical records, and healthcare documentation to provide secure, locally-synthesized insights without external cloud API dependencies.
+## 🧠 Core System Design & Architecture Principles
+* **On-Premise Computational Boundary:** Eliminates third-party cloud API key requirements and external payload exposure. All processed client documentation data, prompt contexts, and vector tensor operations remain completely isolated within the host machine's hardware memory boundary. This architecture guarantees absolute adherence to strict corporate data sandbox regulations.
+* **Layout-Aware Ingestion Pipeline:** Integrates semantic structural markdown parsing strategies to convert raw multi-page medical PDF reference data into text assets while fully retaining explicit heading weights, bold emphasis lines, bullet structures, and complex tabular data grids without stripping meaning.
+* **Quantized Inference Backend Engine:** Built on top of native high-performance optimized C++ backend bindings running a 4-bit quantized inference brain execution layer to ensure rapid token response latency streams on standard desktop hardware configurations.
+## 🛠️ Complete System Technology Stack Matrix
+This architecture uses Streamlit for the UI frontend interface, PyMuPDF4LLM for document ingestion, Llama-cpp-python for high performance local inference execution, and Qwen-2.5-7B-Instruct running 4-bit quantization as the core foundation LLM brain model.
+## 🚀 Architectural Execution Flow Blueprint
+1. Document Ingestion: The user introduces a medical guide or PDF textbook resource using the secure application layout sidebar component.
+2. Context Conversion: The ingestion pipeline translates raw document pages into structured markdown layout data strings dynamically.
+3. Memory State Syncing: Session thread variables are managed via systemic reactivity loops to guarantee historical persistence across application state re-runs.
+4. Local Tensor Processing: The quantized language engine processes data blocks straight from localized system RAM, streaming responses back without making any external calls.
+## 🔒 Automated Verification & Quality Assurance Matrix
+To guarantee strict compliance with modern continuous delivery engineering environments, this project runs an automated software validation matrix across the repository lifespan: Static Code Analysis via Ruff, Type-System checking via Mypy, Security Auditing via Bandit, Dependency Health Checks via Pip-Audit, and Secret Leak Prevention via Gitleaks.
+## 💻 Detailed Local Setup Guide & Installation
+Install the required dependencies from the workspace manifest using pip install -r requirements.txt and initialize the secure localized web dashboard application interface using python -m streamlit run app.py.
