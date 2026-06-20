@@ -1,15 +1,46 @@
 ﻿stages:
+  - lint
+  - format
+  - type_check
   - test
   - audit
 
-run_unit_tests:
+static_linting:
+  stage: lint
   image: python:3.11-slim
-  stage: test
   script:
-    - pip install -r requirements.txt
-    - python -m pytest --cov=app tests/
+    - pip install ruff
+    - ruff check .
 
-security_secret_scan:
+code_formatting:
+  stage: format
+  image: python:3.11-slim
+  script:
+    - pip install ruff
+    - ruff format --check .
+
+type_checking:
+  stage: type_check
+  image: python:3.11-slim
+  script:
+    - pip install mypy
+    - mypy . --ignore-missing-imports
+
+run_unit_tests:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt pytest-cov
+    - python -m pytest --cov=. tests/
+
+dependency_audit:
+  stage: audit
+  image: python:3.11-slim
+  script:
+    - pip install pip-audit
+    - pip-audit -r requirements.txt
+
+secret_scanning:
   stage: audit
   image: zricethezav/gitleaks:latest
   script:
