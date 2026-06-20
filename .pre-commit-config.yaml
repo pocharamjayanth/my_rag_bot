@@ -16,13 +16,13 @@
     hooks:
       - id: bandit
         name: Stage 7: Static Analysis (Bandit)
-        args: ['-r', '.', '-x', 'venv/']
+        args: ["-r", ".", "-x", "venv/"]
   - repo: https://github.com/pypa/pip-audit
     rev: v2.7.2
     hooks:
       - id: pip-audit
         name: Stage 5: Dependency Audit (pip-audit)
-        args: ['-r', 'requirements.txt']
+        args: ["-r", "requirements.txt"]
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.2
     hooks:
