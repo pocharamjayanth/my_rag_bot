@@ -1,4 +1,20 @@
-﻿repos:
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        name: Stage 1: Linting (Ruff)
+      - id: ruff-format
+        name: Stage 2: Formatting (Ruff-Format)
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Stage 3: Type Checking (Mypy)
+
+  - repo:$hooksContent = @'
+repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.0
     hooks:
