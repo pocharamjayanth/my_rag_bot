@@ -48,6 +48,13 @@ pip-audit:
     - pip install pip-audit
     - pip-audit -r requirements.txt
 
+bandit:
+  stage: audit
+  image: python:3.11-slim
+  script:
+    - pip install bandit
+    - bandit -r . -x ./venv
+
 secret_scanning:
   stage: audit
   image: zricethezav/gitleaks:latest
