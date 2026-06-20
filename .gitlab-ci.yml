@@ -1,0 +1,17 @@
+﻿stages:
+  - test
+  - audit
+
+run_unit_tests:
+  image: python:3.11-slim
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - python -m pytest --cov=app tests/
+
+security_secret_scan:
+  stage: audit
+  image: zricethezav/gitleaks:latest
+  script:
+    - gitleaks detect --verbose --source=.
+  allow_failure: true

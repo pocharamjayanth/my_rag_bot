@@ -1,0 +1,5 @@
+﻿[changelog]
+header = "# Changelog\n"
+body = "{% if version %}\n## [{{ version }}]\n{% endif %}\n"
+[git]
+conventional_commits = true

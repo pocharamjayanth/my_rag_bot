@@ -1,25 +1,36 @@
 ﻿repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    rev: v0.3.0
     hooks:
       - id: ruff
-        name: "Stage 1: Linting (Ruff)"
-        args: [ --fix ]
+        name: Stage 1: Linting (Ruff)
       - id: ruff-format
-        name: "Stage 2: Formatting (Ruff-Format)"
+        name: Stage 2: Formatting (Ruff-Format)
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+    rev: v1.8.0
     hooks:
       - id: mypy
-        name: "Stage 3: Type Checking (Mypy)"
-        additional_dependencies: [types-requests]
+        name: Stage 3: Type Checking (Mypy)
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.2
+    hooks:
+      - id: pip-audit
+        name: Stage 5: Dependency Audit (pip-audit)
+        args: ["-r", "requirements.txt"]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.2
+    hooks:
+      - id: gitleaks
+        name: Stage 6: Secret Scanning (gitleaks)
 
   - repo: local
     hooks:
-      - id: pytest
-        name: "Stage 4: Unit Testing (Pytest)"
-        entry: python -m pytest
+      - id: pytest-cov
+        name: Stage 4: Unit Testing & Coverage (Pytest)
+        entry: venv/Scripts/python -m pytest --cov=app tests/
         language: system
         pass_filenames: false
         always_run: true
