@@ -1,4 +1,4 @@
-﻿stages:
+stages:
   - lint
   - format
   - type_check
