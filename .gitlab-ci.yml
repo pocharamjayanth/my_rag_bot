@@ -16,41 +16,42 @@ cache:
 before_script:
   - python3 -m venv venv
   - source venv/bin/activate
-  - pip install --upgrade pip uv
+  - pip install --upgrade pip
+  - pip install ruff flake8 pylint pyupgrade mypy bandit vulture pytest pytest-cov
   - pip install -r requirements.txt || echo "Requirements warning"
 
 job_lint:
   stage: lint
   script:
-    - uv run ruff check . || true
-    - uv run flake8 app.py --max-line-length=120 || true
-    - uv run pylint app.py --disable=C0114,C0115,C0116 || true
-    - uv run pyupgrade --py310-plus app.py || true
+    - ruff check . || true
+    - flake8 app.py --max-line-length=120 || true
+    - pylint app.py --disable=C0114,C0115,C0116 || true
+    - pyupgrade --py310-plus app.py || true
 
 job_format:
   stage: format
   script:
-    - uv run ruff format --check . || true
+    - ruff format --check . || true
 
 job_type_check:
   stage: type_check
   script:
-    - uv run mypy . || true
+    - mypy . || true
 
 analysis_security:
   stage: security
   script:
-    - uv run bandit -r app.py || true
-    - uv run vulture app.py --min-confidence 80 || true
+    - bandit -r app.py || true
+    - vulture app.py --min-confidence 80 || true
     - which gitleaks || (curl -sSL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz && tar -xf gitleaks.tar.gz gitleaks && mv gitleaks venv/bin/ && rm -f gitleaks.tar.gz)
     - gitleaks detect --verbose || true
 
 job_test:
   stage: test
   script:
-    - uv run pytest tests/ || true
+    - pytest tests/ || true
 
 job_coverage:
   stage: coverage
   script:
-    - uv run pytest --cov=. --cov-report=term --cov-fail-under=40 tests/ || true
+    - pytest --cov=. --cov-report=term --cov-fail-under=40 tests/ || true
