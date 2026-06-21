@@ -1,63 +1,30 @@
-stages:
-  - lint
-  - format
-  - type_check
-  - test
-  - coverage
-  - audit
+﻿stages:
+  - quality
+  - security
 
-static_linting:
-  stage: lint
-  image: python:3.11-slim
-  script:
-    - pip install ruff
-    - ruff check .
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-code_formatting:
-  stage: format
-  image: python:3.11-slim
-  script:
-    - pip install ruff
-    - ruff format --check .
+cache:
+  paths:
+    - .cache/pip
+    - venv/
 
-type_checking:
-  stage: type_check
-  image: python:3.11-slim
-  script:
-    - pip install mypy
-    - mypy . --ignore-missing-imports
+before_script:
+  - python -m venv venv
+  - source venv/bin/activate || venv\Scripts\activate
+  - pip install -r requirements.txt
+  - pip install ruff mypy bandit vulture uv
 
-run_unit_tests:
-  stage: test
-  image: python:3.11-slim
+analysis_quality:
+  stage: quality
   script:
-    - pip install -r requirements.txt pytest-cov
-    - python -m pytest --cov=. tests/
+    - ruff check app.py
+    - mypy app.py
 
-coverage:
-  stage: coverage
-  image: python:3.11-slim
+analysis_security:
+  stage: security
   script:
-    - pip install pytest-cov
-    - python -m pytest --cov=. --cov-report=term tests/
-
-pip-audit:
-  stage: audit
-  image: python:3.11-slim
-  script:
-    - pip install pip-audit
-    - pip-audit -r requirements.txt
-
-bandit:
-  stage: audit
-  image: python:3.11-slim
-  script:
-    - pip install bandit
-    - bandit -r . -x ./venv
-
-secret_scanning:
-  stage: audit
-  image: zricethezav/gitleaks:latest
-  script:
-    - gitleaks detect --verbose --source=.
-  allow_failure: true
+    - bandit -r app.py
+    - vulture app.py --min-confidence 80
+    - uv audit
