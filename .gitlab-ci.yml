@@ -1,7 +1,9 @@
 stages:
-  - quality
+  - lint
+  - format
+  - type_check
   - security
-  - test
+  - coverage
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -18,15 +20,23 @@ before_script:
   - pip install ruff mypy bandit vulture uv pylint flake8 semgrep pyupgrade pytest pytest-cov
   - pip install -r requirements.txt || echo "Requirements warning"
 
-analysis_quality:
-  stage: quality
+job_lint:
+  stage: lint
   script:
     - ruff check . || true
-    - ruff format --check . || true
-    - mypy . || true
     - flake8 app.py --max-line-length=120 || true
     - pylint app.py --disable=C0114,C0115,C0116 || true
     - pyupgrade --py310-plus app.py || true
+
+job_format:
+  stage: format
+  script:
+    - ruff format --check . || true
+
+job_type_check:
+  stage: type_check
+  script:
+    - mypy . || true
 
 analysis_security:
   stage: security
@@ -38,7 +48,7 @@ analysis_security:
     - which gitleaks || (wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz && tar -xf gitleaks_8.18.2_linux_x64.tar.gz gitleaks && mv gitleaks venv/bin/ && rm -f gitleaks_*)
     - gitleaks detect --verbose || true
 
-analysis_testing:
-  stage: test
+job_coverage:
+  stage: coverage
   script:
     - pytest --cov=. --cov-report=term --cov-fail-under=40 tests/ || true
