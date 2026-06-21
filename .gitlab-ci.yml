@@ -14,13 +14,16 @@ before_script:
   - python -m venv venv
   - source venv/bin/activate || venv\Scripts\activate
   - pip install -r requirements.txt
-  - pip install ruff mypy bandit vulture uv
+  - pip install ruff mypy bandit vulture uv pylint flake8 semgrep pyupgrade
 
 analysis_quality:
   stage: quality
   script:
     - ruff check app.py
     - mypy app.py
+    - flake8 app.py --max-line-length=120
+    - pylint app.py --disable=C0114,C0115,C0116
+    - pyupgrade --py310-plus app.py
 
 analysis_security:
   stage: security
@@ -28,3 +31,4 @@ analysis_security:
     - bandit -r app.py
     - vulture app.py --min-confidence 80
     - uv audit
+    - semgrep --config=auto app.py

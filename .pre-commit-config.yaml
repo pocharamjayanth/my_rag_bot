@@ -26,11 +26,38 @@
         name: "Stage 4: Dead Code Detection (Vulture)"
         args: ["app.py", "--min-confidence", "80"]
 
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.16.0
+    hooks:
+      - id: pyupgrade
+        name: "Stage 5: Syntax Upgrade (Pyupgrade)"
+        args: [--py310-plus]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        name: "Stage 6: Code Style (Flake8)"
+        args: ["--max-line-length=120"]
+
+  - repo: https://github.com/returntocorp/semgrep
+    rev: v1.75.0
+    hooks:
+      - id: semgrep
+        name: "Stage 7: Semantic Guardrails (Semgrep)"
+        args: ["--config=auto", "--error"]
+
   - repo: local
     hooks:
       - id: uv-audit
-        name: "Stage 5: Package Dependency Audit (uv audit)"
+        name: "Stage 8: Package Dependency Audit (uv audit)"
         entry: powershell -Command "uv audit"
         language: system
         files: requirements.txt
         pass_filenames: false
+
+      - id: pylint
+        name: "Stage 9: Deep Code Analysis (Pylint)"
+        entry: powershell -Command "pylint app.py --disable=C0114,C0115,C0116"
+        language: system
+        files: app.py
