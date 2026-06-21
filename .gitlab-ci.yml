@@ -15,7 +15,7 @@ before_script:
   - source venv/bin/activate
   - pip install --upgrade pip
   - pip install ruff mypy bandit vulture uv pylint flake8 semgrep pyupgrade
-  - pip install -r requirements.txt || echo "Requirements installation completed with warnings"
+  - pip install -r requirements.txt || echo "Requirements warning"
 
 analysis_quality:
   stage: quality
