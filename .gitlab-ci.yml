@@ -21,8 +21,9 @@ before_script:
 analysis_quality:
   stage: quality
   script:
-    - ruff check app.py || true
-    - mypy app.py || true
+    - ruff check . || true
+    - ruff format --check . || true
+    - mypy . || true
     - flake8 app.py --max-line-length=120 || true
     - pylint app.py --disable=C0114,C0115,C0116 || true
     - pyupgrade --py310-plus app.py || true
