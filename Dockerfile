@@ -1,13 +1,5 @@
 FROM python:3.11-slim
 
-# Install C++ compilers and build tools required for llama-cpp-python
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 COPY requirements.txt .
