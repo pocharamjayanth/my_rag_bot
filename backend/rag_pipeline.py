@@ -16,32 +16,40 @@ collection = chroma_client.get_or_create_collection(
 )
 
 def process_and_index_pdf(pdf_path: str, document_id: str) -> int:
-    """Extracts text, splits into chunks, creates embeddings, and stores in ChromaDB."""
-    full_text = pymupdf4llm.to_markdown(pdf_path)
-    
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
-    )
-    chunks = text_splitter.split_text(full_text)
-    
-    ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
-    metadatas = [{"document_id": document_id, "chunk_index": i} for i in range(len(chunks))]
-    
-    collection.add(
-        documents=chunks,
-        ids=ids,
-        metadatas=metadatas
-    )
-    return len(chunks)
+    try:
+        collection.delete(where={"document_id": document_id})
+    except Exception:
+        pass
 
-def retrieve_relevant_context(query: str, top_k: int = 3) -> str:
-    """Performs semantic vector search and returns top matching chunks."""
+    try:
+        full_text = pymupdf4llm.to_markdown(pdf_path)
+        if not full_text.strip():
+            raise ValueError("Extracted document text is empty.")
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=50
+        )
+        chunks = text_splitter.split_text(full_text)
+
+        ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
+        metadatas = [{"document_id": document_id, "chunk_index": i} for i in range(len(chunks))]
+
+        collection.add(
+            documents=chunks,
+            ids=ids,
+            metadatas=metadatas
+        )
+        return len(chunks)
+    except Exception as e:
+        raise RuntimeError(f"Failed to process and index PDF: {str(e)}")
+
+def retrieve_relevant_context(query: str, document_id: str, top_k: int = 3) -> str:
     results = collection.query(
         query_texts=[query],
-        n_results=top_k
+        n_results=top_k,
+        where={"document_id": document_id}
     )
-    
     if results and "documents" in results and len(results["documents"]) > 0:
         retrieved_chunks = results["documents"][0]
         return "\n\n---\n\n".join(retrieved_chunks)
